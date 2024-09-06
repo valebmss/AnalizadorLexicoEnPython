@@ -15,15 +15,28 @@ TOKENS = [
     ('tk_par_der', r'\)'),
     ('tk_llave_izq', r'\{'),
     ('tk_llave_der', r'\}'),
+    ('tk_cor_izq', r'\['),
+    ('tk_cor_der', r'\]'),
     ('tk_dos_puntos', r':'),
     ('tk_asig', r'='),
     ('tk_mas', r'\+'),
     ('tk_menos', r'-'),
     ('tk_mult', r'\*'),
     ('tk_div', r'/'),
-    ('numero', r'\d+'),
+    ('tk_entero', r'\d+'),
     ('tk_punto', r'\.'),
-    ('tk_cadena', r'\".*?\"'),
+    ('tk_cadena_doble', r'\".*?\"'),
+    ('tk_cadena_simple', r'\'.*?\''),
+    ('tk_mayor', r'>'),
+    ('tk_menor', r'<'),
+    ('tk_flecha', r'->'),
+    ('tk_comentario', r'#.*'),  # Comentarios en Python
+    ('tk_coma', r','),
+    ('tk_punto_coma', r';'),
+    ('tk_igual_igual', r'=='),
+    ('tk_diferente', r'!='),
+    ('tk_mayor_igual', r'>='),
+    ('tk_menor_igual', r'<=')
 ]
 
 def analizador_lexico(archivo_entrada):
@@ -42,19 +55,34 @@ def analizador_lexico(archivo_entrada):
         pos = 0
         print(f"Analizando línea {num_linea}: {linea}")
         while pos < len(linea):
+            # Ignorar espacios en blanco
+            if linea[pos] == ' ':
+                pos += 1
+                continue
+
+            # Ignorar comentarios
+            if linea[pos] == '#':
+                break
+
             match = None
             for token_tipo, token_regex in TOKENS:
                 patron = re.compile(token_regex)
                 match = patron.match(linea, pos)
                 if match:
                     token = match.group(0)
-                    print(f"Token encontrado: {token_tipo} -> {token} (línea {num_linea}, posición {pos + 1})")
+                    # Si el token es un comentario, lo ignoramos
+                    if token_tipo == 'tk_comentario':
+                        break
+                    print(f"Token encontrado: {token_tipo} -> '{token}' (línea {num_linea}, posición {pos + 1})")
                     tokens_encontrados.append((token_tipo, token, num_linea, pos + 1))
                     pos = match.end(0)
                     break
+
+            # Si no hay coincidencias y no es espacio en blanco, lanzamos un error léxico
             if not match:
-                print(f"Ningún token coincide en la posición {pos + 1} de la línea {num_linea}")
-                pos += 1
+                print(f"Carácter no reconocido: '{linea[pos]}' en línea {num_linea}, posición {pos + 1}")
+                print(f">>> Error léxico (línea:{num_linea}, posición:{pos + 1})")
+                return []  # Detenemos el análisis en el primer error léxico
 
     return tokens_encontrados
 
@@ -78,4 +106,4 @@ if __name__ == '__main__':
         print("Tokens encontrados:")
         generar_salida(tokens, archivo_salida)
     else:
-        print("No se encontraron tokens.")
+        print("No se encontraron tokens o se produjo un error léxico.")
