@@ -65,12 +65,16 @@ def leer_numero(linea, pos):
 
 def leer_string(linea, pos):
     cadena = ''
-    delimitador = linea[pos]
+    delimitador = linea[pos]  # Puede ser ' o "
     pos += 1
+    inicio_pos = pos  # Posición inicial para el valor del string sin comillas
+
     while pos < len(linea) and linea[pos] != delimitador:
         cadena += linea[pos]
         pos += 1
-    return cadena, pos + 1
+
+    return delimitador + cadena + delimitador, pos + 1  # Regresar el string con las comillas
+
 
 def analizador_lexico(archivo_entrada):
     try:
