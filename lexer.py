@@ -117,11 +117,19 @@ def analizador_lexico(archivo_entrada):
                 pos = nuevo_pos
 
             elif es_operador(linea[pos]) or es_separador(linea[pos]):
-                if linea[pos:pos+2] in TOKENS:
-                    token = (linea[pos:pos+2], num_linea, pos + 1)  # Solo el nombre del token
+                # Primero revisamos si el símbolo completo de 2 caracteres está en TOKENS
+                if linea[pos:pos+2] in TOKENS.values():
+                    for key, value in TOKENS.items():
+                        if value == linea[pos:pos+2]:
+                            token = (key, num_linea, pos + 1)  # Obtenemos el nombre del token
+                            break
                     pos += 2
                 else:
-                    token = (linea[pos], num_linea, pos + 1)  # Solo el nombre del token
+                    # Para un solo carácter
+                    for key, value in TOKENS.items():
+                        if value == linea[pos]:
+                            token = (key, num_linea, pos + 1)  # Obtenemos el nombre del token
+                            break
                     pos += 1
 
             if token:
@@ -139,9 +147,11 @@ def generar_salida(tokens_encontrados, archivo_salida):
         with open(archivo_salida, 'w') as f:
             for token in tokens_encontrados:
                 if len(token) == 4:
+                    # Este formato es para los tokens con un valor adicional (por ejemplo, identificadores y literales)
                     f.write(f'<{token[0]},{token[1]},{token[2]},{token[3]}>\n')
                 else:
-                    f.write(f'<{token[0]},{token[1]},{token[2]}>\n')  # Para palabras reservadas, que no tienen valor
+                    # Este formato es para los tokens que no tienen un valor asociado (palabras reservadas y operadores)
+                    f.write(f'<{token[0]},{token[1]},{token[2]}>\n')
         print(f"Archivo de salida generado correctamente: {archivo_salida}")
     except Exception as e:
         print(f"Error al escribir en el archivo '{archivo_salida}': {e}")
