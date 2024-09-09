@@ -1,43 +1,76 @@
-import re
+TOKENS = {
+    'class': 'class',
+    'def': 'def',
+    'if': 'if',
+    'else': 'else',
+    'while': 'while',
+    'for': 'for',
+    'print': 'print',
+    'return': 'return',
+    'tk_par_izq': '(',
+    'tk_par_der': ')',
+    'tk_llave_izq': '{',
+    'tk_llave_der': '}',
+    'tk_cor_izq': '[',
+    'tk_cor_der': ']',
+    'tk_dos_puntos': ':',
+    'tk_asig': '=',
+    'tk_mas': '+',
+    'tk_menos': '-',
+    'tk_mult': '*',
+    'tk_div': '/',
+    'tk_punto': '.',
+    'tk_mayor': '>',
+    'tk_menor': '<',
+    'tk_flecha': '->',
+    'tk_coma': ',',
+    'tk_punto_coma': ';',
+    'tk_igual_igual': '==',
+    'tk_diferente': '!=',
+    'tk_mayor_igual': '>=',
+    'tk_menor_igual': '<=',
+}
 
-# Definición de tokens como expresiones regulares
-TOKENS = [
-    ('class', r'\bclass\b'),
-    ('def', r'\bdef\b'),
-    ('if', r'\bif\b'),
-    ('else', r'\belse\b'),
-    ('while', r'\bwhile\b'),
-    ('for', r'\bfor\b'),
-    ('print', r'\bprint\b'),
-    ('return', r'\breturn\b'),
-    ('id', r'[a-zA-Z_][a-zA-Z_0-9]*'),
-    ('tk_par_izq', r'\('),
-    ('tk_par_der', r'\)'),
-    ('tk_llave_izq', r'\{'),
-    ('tk_llave_der', r'\}'),
-    ('tk_cor_izq', r'\['),
-    ('tk_cor_der', r'\]'),
-    ('tk_dos_puntos', r':'),
-    ('tk_asig', r'='),
-    ('tk_mas', r'\+'),
-    ('tk_menos', r'-'),
-    ('tk_mult', r'\*'),
-    ('tk_div', r'/'),
-    ('tk_entero', r'\d+'),
-    ('tk_punto', r'\.'),
-    ('tk_cadena_doble', r'\".*?\"'),
-    ('tk_cadena_simple', r'\'.*?\''),
-    ('tk_mayor', r'>'),
-    ('tk_menor', r'<'),
-    ('tk_flecha', r'->'),
-    ('tk_comentario', r'#.*'),  # Comentarios en Python
-    ('tk_coma', r','),
-    ('tk_punto_coma', r';'),
-    ('tk_igual_igual', r'=='),
-    ('tk_diferente', r'!='),
-    ('tk_mayor_igual', r'>='),
-    ('tk_menor_igual', r'<=')
-]
+def es_digito(c):
+    return '0' <= c <= '9'
+
+def es_letra(c):
+    return 'a' <= c <= 'z' or 'A' <= c <= 'Z' or c == '_'
+
+def es_espacio(c):
+    return c in [' ', '\t', '\n']
+
+def es_operador(c):
+    return c in ['+', '-', '*', '/', '=', '>', '<']
+
+def es_separador(c):
+    return c in ['(', ')', '{', '}', '[', ']', ':', '.', ',', ';']
+
+def es_comentario(linea, pos):
+    return linea[pos] == '#'
+
+def leer_palabra(linea, pos):
+    palabra = ''
+    while pos < len(linea) and (es_letra(linea[pos]) or es_digito(linea[pos])):
+        palabra += linea[pos]
+        pos += 1
+    return palabra, pos
+
+def leer_numero(linea, pos):
+    numero = ''
+    while pos < len(linea) and es_digito(linea[pos]):
+        numero += linea[pos]
+        pos += 1
+    return numero, pos
+
+def leer_string(linea, pos):
+    cadena = ''
+    delimitador = linea[pos]
+    pos += 1
+    while pos < len(linea) and linea[pos] != delimitador:
+        cadena += linea[pos]
+        pos += 1
+    return cadena, pos + 1
 
 def analizador_lexico(archivo_entrada):
     try:
@@ -55,34 +88,49 @@ def analizador_lexico(archivo_entrada):
         pos = 0
         print(f"Analizando línea {num_linea}: {linea}")
         while pos < len(linea):
-            # Ignorar espacios en blanco
-            if linea[pos] == ' ':
+            if es_espacio(linea[pos]):
                 pos += 1
                 continue
 
-            # Ignorar comentarios
-            if linea[pos] == '#':
+            if es_comentario(linea, pos):
                 break
 
-            match = None
-            for token_tipo, token_regex in TOKENS:
-                patron = re.compile(token_regex)
-                match = patron.match(linea, pos)
-                if match:
-                    token = match.group(0)
-                    # Si el token es un comentario, lo ignoramos
-                    if token_tipo == 'tk_comentario':
-                        break
-                    print(f"Token encontrado: {token_tipo} -> '{token}' (línea {num_linea}, posición {pos + 1})")
-                    tokens_encontrados.append((token_tipo, token, num_linea, pos + 1))
-                    pos = match.end(0)
-                    break
+            token = None
 
-            # Si no hay coincidencias y no es espacio en blanco, lanzamos un error léxico
-            if not match:
+            if es_letra(linea[pos]):
+                palabra, nuevo_pos = leer_palabra(linea, pos)
+                if palabra in TOKENS:
+                    token = (palabra, num_linea, pos + 1)  # Solo el nombre del token
+                else:
+                    token = ('id', palabra, num_linea, pos + 1)
+                pos = nuevo_pos
+
+            elif es_digito(linea[pos]):
+                numero, nuevo_pos = leer_numero(linea, pos)
+                token = ('tk_entero', numero, num_linea, pos + 1)
+                pos = nuevo_pos
+
+            elif linea[pos] in ['"', "'"]:
+                cadena, nuevo_pos = leer_string(linea, pos)
+                token_tipo = 'tk_cadena_doble' if linea[pos] == '"' else 'tk_cadena_simple'
+                token = (token_tipo, cadena, num_linea, pos + 1)
+                pos = nuevo_pos
+
+            elif es_operador(linea[pos]) or es_separador(linea[pos]):
+                if linea[pos:pos+2] in TOKENS:
+                    token = (linea[pos:pos+2], num_linea, pos + 1)  # Solo el nombre del token
+                    pos += 2
+                else:
+                    token = (linea[pos], num_linea, pos + 1)  # Solo el nombre del token
+                    pos += 1
+
+            if token:
+                print(f"Token encontrado: {token[0]} (línea {num_linea}, posición {token[2]})")
+                tokens_encontrados.append(token)
+            else:
                 print(f"Carácter no reconocido: '{linea[pos]}' en línea {num_linea}, posición {pos + 1}")
                 print(f">>> Error léxico (línea:{num_linea}, posición:{pos + 1})")
-                return []  # Detenemos el análisis en el primer error léxico
+                return []
 
     return tokens_encontrados
 
@@ -90,7 +138,10 @@ def generar_salida(tokens_encontrados, archivo_salida):
     try:
         with open(archivo_salida, 'w') as f:
             for token in tokens_encontrados:
-                f.write(f'<{token[0]},{token[1]},{token[2]},{token[3]}>\n')
+                if len(token) == 4:
+                    f.write(f'<{token[0]},{token[1]},{token[2]},{token[3]}>\n')
+                else:
+                    f.write(f'<{token[0]},{token[1]},{token[2]}>\n')  # Para palabras reservadas, que no tienen valor
         print(f"Archivo de salida generado correctamente: {archivo_salida}")
     except Exception as e:
         print(f"Error al escribir en el archivo '{archivo_salida}': {e}")
