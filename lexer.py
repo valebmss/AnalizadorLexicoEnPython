@@ -43,7 +43,6 @@ TOKENS = {
     'with': 'with',
     'yield': 'yield',
     'print': 'print',
-    'return': 'return',
     'tk_par_izq': '(',
     'tk_par_der': ')',
     'tk_llave_izq': '{',
@@ -63,7 +62,7 @@ TOKENS = {
     'tk_coma': ',',
     'tk_punto_coma': ';',
     'tk_igual_igual': '==',
-    'tk_diferente': '!=',
+    'tk_distinto': '!=',
     'tk_mayor_igual': '>=',
     'tk_menor_igual': '<=',
 }
@@ -95,7 +94,10 @@ def leer_palabra(linea, pos):
 
 def leer_numero(linea, pos):
     numero = ''
-    while pos < len(linea) and es_digito(linea[pos]):
+    punto_visto = False
+    while pos < len(linea) and (es_digito(linea[pos]) or (linea[pos] == '.' and not punto_visto)):
+        if linea[pos] == '.':
+            punto_visto = True
         numero += linea[pos]
         pos += 1
     return numero, pos
@@ -104,7 +106,6 @@ def leer_string(linea, pos):
     cadena = ''
     delimitador = linea[pos]  # Puede ser ' o "
     pos += 1
-    inicio_pos = pos  # Posición inicial para el valor del string sin comillas
 
     while pos < len(linea) and linea[pos] != delimitador:
         cadena += linea[pos]
@@ -112,6 +113,8 @@ def leer_string(linea, pos):
 
     return delimitador + cadena + delimitador, pos + 1  # Regresar el string con las comillas
 
+def imprimir_error_lexico(linea, num_linea, pos):
+    print(f">>> Error léxico (línea:{num_linea}, posición:{pos + 1})")
 
 def analizador_lexico(archivo_entrada):
     try:
@@ -120,9 +123,10 @@ def analizador_lexico(archivo_entrada):
             print(f"Archivo de entrada leído correctamente: {archivo_entrada}")
     except FileNotFoundError:
         print(f"Error: El archivo '{archivo_entrada}' no existe.")
-        return []
+        return [], []
 
     tokens_encontrados = []
+    errores_lexicos = []
     lineas = codigo.split('\n')
 
     for num_linea, linea in enumerate(lineas, 1):
@@ -138,7 +142,15 @@ def analizador_lexico(archivo_entrada):
 
             token = None
 
-            if es_letra(linea[pos]):
+            if pos + 1 < len(linea) and linea[pos:pos+2] in TOKENS.values():
+                # Verificar si el símbolo de 2 caracteres está en TOKENS
+                for key, value in TOKENS.items():
+                    if value == linea[pos:pos+2]:
+                        token = (key, num_linea, pos + 1)  # Obtenemos el nombre del token
+                        break
+                pos += 2
+
+            elif es_letra(linea[pos]):
                 palabra, nuevo_pos = leer_palabra(linea, pos)
                 if palabra in TOKENS:
                     token = (palabra, num_linea, pos + 1)  # Solo el nombre del token
@@ -146,9 +158,10 @@ def analizador_lexico(archivo_entrada):
                     token = ('id', palabra, num_linea, pos + 1)
                 pos = nuevo_pos
 
-            elif es_digito(linea[pos]):
+            elif es_digito(linea[pos]) or (linea[pos] == '.' and pos + 1 < len(linea) and es_digito(linea[pos + 1])):
                 numero, nuevo_pos = leer_numero(linea, pos)
-                token = ('tk_entero', numero, num_linea, pos + 1)
+                token_tipo = 'tk_flotante' if '.' in numero else 'tk_entero'
+                token = (token_tipo, numero, num_linea, pos + 1)
                 pos = nuevo_pos
 
             elif linea[pos] in ['"', "'"]:
@@ -157,44 +170,56 @@ def analizador_lexico(archivo_entrada):
                 token = (token_tipo, cadena, num_linea, pos + 1)
                 pos = nuevo_pos
 
-            elif es_operador(linea[pos]) or es_separador(linea[pos]):
-                # Primero revisamos si el símbolo completo de 2 caracteres está en TOKENS
-                if linea[pos:pos+2] in TOKENS.values():
-                    for key, value in TOKENS.items():
-                        if value == linea[pos:pos+2]:
-                            token = (key, num_linea, pos + 1)  # Obtenemos el nombre del token
-                            break
-                    pos += 2
-                else:
-                    # Para un solo carácter
-                    for key, value in TOKENS.items():
-                        if value == linea[pos]:
-                            token = (key, num_linea, pos + 1)  # Obtenemos el nombre del token
-                            break
-                    pos += 1
+            elif linea[pos] in TOKENS.values():
+                # Para un solo carácter
+                for key, value in TOKENS.items():
+                    if value == linea[pos]:
+                        token = (key, num_linea, pos + 1)  # Obtenemos el nombre del token
+                        break
+                pos += 1
 
             if token:
                 print(f"Token encontrado: {token[0]} (línea {num_linea}, posición {token[2]})")
                 tokens_encontrados.append(token)
             else:
-                print(f">>> Error léxico (línea:{num_linea}, posición:{pos + 1})")
-                return []
+                imprimir_error_lexico(linea, num_linea, pos)
+                errores_lexicos.append((num_linea, pos + 1))
+                pos += 1  # Avanzar para continuar analizando el resto de la línea
 
-    return tokens_encontrados
+    return tokens_encontrados, errores_lexicos
 
-def generar_salida(tokens_encontrados, archivo_salida):
+def generar_salida(tokens_encontrados, errores_lexicos, archivo_salida):
     try:
         with open(archivo_salida, 'w') as f:
-            for token in tokens_encontrados:
-                if len(token) == 4:
-                    # Este formato es para los tokens con un valor adicional (por ejemplo, identificadores y literales)
-                    f.write(f'<{token[0]},{token[1]},{token[2]},{token[3]}>\n')
-                else:
-                    # Este formato es para los tokens que no tienen un valor asociado (palabras reservadas y operadores)
-                    f.write(f'<{token[0]},{token[1]},{token[2]}>\n')
+            print(f"Generando archivo de salida: {archivo_salida}")
+
+            contenido_generado = False
+
+            # Escribir tokens
+            if tokens_encontrados:
+                for token in tokens_encontrados:
+                    if len(token) == 4:
+                        # Este formato es para los tokens con un valor adicional (por ejemplo, identificadores y literales)
+                        f.write(f'<{token[0]},{token[1]},{token[2]},{token[3]}>\n')
+                    else:
+                        # Este formato es para los tokens que no tienen un valor asociado (palabras reservadas y operadores)
+                        f.write(f'<{token[0]},{token[1]},{token[2]}>\n')
+                contenido_generado = True
+
+            # Escribir errores léxicos
+            if errores_lexicos:
+                for error in errores_lexicos:
+                    f.write(f">>> Error léxico (línea:{error[0]}, posición:{error[1]})\n")
+                contenido_generado = True
+
+            # Escribir un mensaje si el archivo está vacío
+            if not contenido_generado:
+                f.write("No se encontraron tokens ni errores léxicos.\n")
+
         print(f"Archivo de salida generado correctamente: {archivo_salida}")
     except Exception as e:
         print(f"Error al escribir en el archivo '{archivo_salida}': {e}")
+
 
 if __name__ == '__main__':
     archivo_entrada = 'entrada.py'
@@ -202,9 +227,8 @@ if __name__ == '__main__':
 
     print(f"Analizando archivo de entrada: {archivo_entrada}")
 
-    tokens = analizador_lexico(archivo_entrada)
+    tokens, errores_lexicos = analizador_lexico(archivo_entrada)
     if tokens:
         print("Tokens encontrados:")
-        generar_salida(tokens, archivo_salida)
-    else:
-        print("No se encontraron tokens o se produjo un error léxico.")
+        generar_salida(tokens, errores_lexicos, archivo_salida)
+
