@@ -1,3 +1,5 @@
+import os;
+
 TOKENS = {
     'class': 'class',
     'def': 'def',
@@ -189,8 +191,15 @@ def analizador_lexico(archivo_entrada):
     return tokens_encontrados, errores_lexicos
 
 def generar_salida(tokens_encontrados, errores_lexicos, archivo_salida):
+    print(f"Generando archivo de salida: {archivo_salida}")
+    # Eliminar el archivo de salida si ya existe
+    if os.path.exists(archivo_salida):
+        print(f"Eliminando el archivo existente: {archivo_salida}")
+
     try:
         with open(archivo_salida, 'w') as f:
+            f.write(f'   ')
+
             print(f"Generando archivo de salida: {archivo_salida}")
 
             contenido_generado = False
@@ -214,12 +223,11 @@ def generar_salida(tokens_encontrados, errores_lexicos, archivo_salida):
 
             # Escribir un mensaje si el archivo está vacío
             if not contenido_generado:
-                f.write("No se encontraron tokens ni errores léxicos.\n")
+                print("No se encontraron tokens ni errores léxicos.\n")
 
         print(f"Archivo de salida generado correctamente: {archivo_salida}")
     except Exception as e:
         print(f"Error al escribir en el archivo '{archivo_salida}': {e}")
-
 
 if __name__ == '__main__':
     archivo_entrada = 'entrada.py'
@@ -228,7 +236,6 @@ if __name__ == '__main__':
     print(f"Analizando archivo de entrada: {archivo_entrada}")
 
     tokens, errores_lexicos = analizador_lexico(archivo_entrada)
-    if tokens:
-        print("Tokens encontrados:")
-        generar_salida(tokens, errores_lexicos, archivo_salida)
+
+    generar_salida(tokens, errores_lexicos, archivo_salida)
 
